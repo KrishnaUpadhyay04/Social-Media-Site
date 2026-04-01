@@ -9,10 +9,23 @@ import fs from 'fs';
 // Get User Data using userId
 export const getUserData = async (req, res) => {
     try{
-        const { userId } = req.auth()
+        const { userId } = await req.auth()
         const user = await User.findById(userId)
         if(!user){
-            return res.json({success: false, message: "User not found"})
+            //return res.json({success: false, message: "User not found"})
+            user = await User.create({
+                _id: userId,
+                username: "",
+                email: "",
+                full_name: "",
+                bio: "",
+                location: "",
+                profile_picture: "",
+                cover_photo: "",
+                followers: [],
+                following: [],
+                connections: []
+            });
         }
         res.json({success: true, user})
     } catch (error) {
@@ -24,7 +37,7 @@ export const getUserData = async (req, res) => {
 // Update User Data
 export const updateUserData = async (req, res) => {
     try{
-        const { userId } = req.auth()
+        const { userId } = await req.auth()
         let {username, bio, location, full_name} = req.body;
 
         const tempUser = await User.findById(userId)
@@ -98,7 +111,7 @@ export const updateUserData = async (req, res) => {
 // Find Users using username, email, location, name
 export const dicoverUsers = async (req, res) => {
     try{
-        const { userId } = req.auth()
+        const { userId } = await req.auth()
         const { input } = req.body;
 
         const allUsers = await User.find(
@@ -124,7 +137,7 @@ export const dicoverUsers = async (req, res) => {
 // Follow User
 export const followUser = async (req, res) => {
     try{
-        const { userId } = req.auth()
+        const { userId } = await req.auth()
         const { id } = req.body;
 
         const user = await User.findById(userId)
@@ -151,7 +164,7 @@ export const followUser = async (req, res) => {
 // Unfollow User
 export const unfollowUser = async (req, res) => {
     try{
-        const { userId } = req.auth()
+        const { userId } = await req.auth()
         const { id } = req.body;
 
         const user = await User.findById(userId)
@@ -173,7 +186,7 @@ export const unfollowUser = async (req, res) => {
 // Send Connection Request
 export const sendConnectionRequest = async(req, res) => {
     try{
-        const {userId} = req.auth()
+        const {userId} = await req.auth()
         const { id } = req.body;
 
         // Check if user has sent more than 20 connections requests in the last 24 hours
@@ -186,8 +199,8 @@ export const sendConnectionRequest = async(req, res) => {
         // Check if users are already connected
         const connection = await Connection.findOne({
             $or: [
-                {rom_user_id: userId, to_user_id: id},
-                {rom_user_id: id, to_user_id: userId},
+                {from_user_id: userId, to_user_id: id},
+                {from_user_id: id, to_user_id: userId},
             ]
         })
 
@@ -219,7 +232,7 @@ export const sendConnectionRequest = async(req, res) => {
 // Get User Connections
 export const getUserConnections = async(req, res) => {
     try{
-        const {userId} = req.auth()
+        const {userId} = await req.auth()
         const user = await User.findById(userId).populate('connections followers following')
 
         const connections = user.connections
@@ -239,7 +252,7 @@ export const getUserConnections = async(req, res) => {
 // Accept Connection Request
 export const acceptConnectionRequest = async(req, res) => {
     try{
-        const {userId} = req.auth()
+        const {userId} = await req.auth()
         const { id } = req.body;
 
         const connection = await Connection.findOne({from_user_id: id, to_user_id: userId})
@@ -248,7 +261,7 @@ export const acceptConnectionRequest = async(req, res) => {
             return res.json({ success: false, message: 'Connection not found' });
         }
 
-        const user = await user.findById(userId);
+        const user = await User.findById(userId);
         user.connections.push(id);
         await user.save()
 

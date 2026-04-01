@@ -13,7 +13,7 @@ const syncUserCreation = inngest.createFunction(
     {id: 'sync-user-from-cler'},
     {event: 'clerk/user.created'},
     async ({event}) => {
-        // await connectDB();
+        await connectDB();
         const {id, first_name, last_name, email_addresses, image_url} = event.data
         let username = email_addresses[0].email_address.split('@')[0]
 
@@ -123,11 +123,12 @@ const sendNewConnectionRequestReminder = inngest.createFunction(
 // innngest Function to deletestory after 24 hours
 const deleteStory = inngest.createFunction(
     {id: 'story-delete'},
-    {event: 'a[[/story.delete' },
+    {event: 'app/story.delete' },
     async ({ event, step }) => {
         const {storyId} = event.data;
-        const in24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000)
-        await step.sleepUntil('wait-for-24-hours', in24Hours)
+        // const in24Hours = new Date(Date.now() + 24 * 60 * 60 * 1000)
+        // await step.sleepUntil('wait-for-24-hours', in24Hours)
+        await step.sleep("wait-for-24-hours", "24h")
         await step.run("delete-story", async () => {
             await Story.findByIdAndDelete(storyId)
             return { message: "Story deleted."}

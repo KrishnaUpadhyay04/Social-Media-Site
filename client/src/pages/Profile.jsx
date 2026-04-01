@@ -7,22 +7,46 @@ import UserProfileInfo from '../components/UserProfileInfo'
 import PostCard from '../components/PostCard'
 import moment from 'moment'
 import ProfileModal from '../components/ProfileModal'
+import { useAuth } from '@clerk/clerk-react'
+import api from '../api/axios'
+import toast from 'react-hot-toast'
+import { useSelector } from 'react-redux'
 
 const Profile = () => {
+
+  const currentUser = useSelector((state) => state.user.value)
+
+  const {getToken} = useAuth()
   const {profileId} = useParams()
   const [user, setuser] = useState(null)
   const [posts, setPosts] = useState([])
   const [activeTab, setActiveTab] = useState('posts')
   const [showEdit, setShowEdit] = useState(false)
 
-  const fetchuser = async () => {
-    setuser(dummyUserData)
-    setPosts(dummyPostsData)
+  const fetchuser = async (profileId) => {
+    const token = await getToken()
+    try{
+      const { data } = await api.post(`/api/user/profiles`, {profileId}, {
+        headers: {Authorization: `Bearer ${token}`}
+      })
+      if(data.success){
+        setuser(data.profile)
+        setPosts(data.posts)
+      }else{
+        toast.error(error.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+    }
   }
 
   useEffect(() => {
-    fetchuser()
-  },[])
+    if(profileId){
+      fetchuser(profileId)
+    }else{
+      fetchuser(currentUser._id)
+    }
+  },[profileId, currentUser])
 
   return user ? (
     <div className='relative h-full overflow-y-scroll bg-gray-50 p-6'>
@@ -54,10 +78,10 @@ const Profile = () => {
           )}
           
           {/* Media */}
-          {activeTab === 'media' && (
+          {/* {activeTab === 'media' && (
             <div className='flex flex-wrap mt-6 max-w-6xl'>
               {
-                posts.filter((post) => post.image_urls.length > 0).map((post) => (
+                posts.filter((post) =>(post.media && post.media.length > 0) ||( post.image_urls && post.image_urls.length > 0)).map((post) => (
                   <>
                     {post.image_urls.map((image, index) => (
                       <Link target='_blank' to={image} key={index} className='relative group'>
@@ -69,7 +93,68 @@ const Profile = () => {
                 ))
               }
             </div>
-          )}
+          )} */}
+          {/* Media */}
+{activeTab === 'media' && (
+  <div className='flex flex-wrap mt-6 max-w-6xl gap-2'>
+    {posts
+      .filter(
+        (post) =>
+          (post.media && post.media.length > 0) ||
+          (post.image_urls && post.image_urls.length > 0)
+      )
+      .map((post) => (
+        <React.Fragment key={post._id}>
+          {/* Cloudinary posts */}
+          {post.media
+            ? post.media.map((m, index) => (
+                <Link
+                  key={index}
+                  target='_blank'
+                  to={m.url}
+                  className='relative group'
+                >
+                  {m.type === 'image' ? (
+                    <img
+                      src={m.url}
+                      className='w-64 aspect-video object-cover'
+                      alt=''
+                    />
+                  ) : (
+                    <video
+                      src={m.url}
+                      className='w-64 aspect-video object-cover'
+                    />
+                  )}
+
+                  <p className='absolute bottom-0 right-0 text-xs p-1 px-3 backdrop-blur-xl text-white opacity-0 group-hover:opacity-100 transition duration-300'>
+                    Posted {moment(post.createdAt).fromNow()}
+                  </p>
+                </Link>
+              ))
+            : /* Old ImageKit posts fallback */
+              post.image_urls?.map((image, index) => (
+                <Link
+                  target='_blank'
+                  to={image}
+                  key={index}
+                  className='relative group'
+                >
+                  <img
+                    src={image}
+                    className='w-64 aspect-video object-cover'
+                    alt=''
+                  />
+                  <p className='absolute bottom-0 right-0 text-xs p-1 px-3 backdrop-blur-xl text-white opacity-0 group-hover:opacity-100 transition duration-300'>
+                    Posted {moment(post.createdAt).fromNow()}
+                  </p>
+                </Link>
+              ))}
+        </React.Fragment>
+      ))}
+  </div>
+)}
+
 
         </div>
       </div>

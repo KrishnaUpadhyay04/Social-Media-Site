@@ -9,6 +9,8 @@ import userRouter from './routes/userRoutes.js';
 import postRouter from './routes/postRoutes.js';
 import storyRouter from './routes/storyRoutes.js';
 import messageRouter from './routes/messageRoutes.js';
+import commentRoutes from './routes/commentRoutes.js';
+import cloudinaryTestRoutes from './routes/testRoutes.js';
 
 const app = express();
 
@@ -24,6 +26,8 @@ app.use('/api/user', userRouter)
 app.use('/api/post', postRouter)
 app.use('/api/story', storyRouter)
 app.use('/api/message', messageRouter)
+app.use('/api/post', commentRoutes);
+app.use("/api", cloudinaryTestRoutes);
 
 const PORT = process.env.PORT || 4000;
 

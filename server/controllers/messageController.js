@@ -1,18 +1,26 @@
 import fs, { readFileSync } from "fs";
 import imageKit from "../configs/imageKit.js";
 import Message from "../models/Message.js";
+import User from "../models/User.js";
 
 // Create an empty object to store SS Event connections
 const connections = {};
 
 // Controller function for the SSE endpoint
-export const sseController = (req, res) => {
-    const { userId } = req.params
+export const sseController = async (req, res) => {
+  try {
+   const { userId } = await req.auth()
+
+    if(!userId) {
+      console.log("SSE Blocked: missing unserId");
+      return res.status(401).json({ success: false, message: "Unauthorized"})
+    }
+
     console.log('New client connected : ', userId)
 
     // Set SSE headers
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setheader('Cache-Control', 'no-cache');
+    res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -20,20 +28,24 @@ export const sseController = (req, res) => {
     connections[userId] = res
 
     // Send an initial event to the client
-    res.write('log: Connected to SSE stream\n\n');
+    res.write('data: Connected to SSE stream\n\n');
 
     // Handle client disconnection
     req.on('close', () => {
         // Remove the client's response object from the connections array
         delete connections[userId];
         console.log('Client disconnected');
-    })
+    }) 
+  } catch (error) {
+    console.log("SSE Error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 }
 
 // Send Message
 export const sendMessage = async (req, res) => {
     try{
-        const { userID } = req.auth();
+        const { userId } = await req.auth();
         const { to_user_id, text } = req.body;
         const image = req.file;
 
@@ -76,7 +88,7 @@ export const sendMessage = async (req, res) => {
 
     } catch (error) {
         console.log(error);
-        res.josn({ success: false, message: error.message });
+        res.json({ success: false, message: error.message });
     }
 }
 
@@ -111,3 +123,68 @@ export const getUserRecentMessages = async (req, res) => {
         res.json({ success: false, message: error.message });
     }
 }
+
+// Recent Messages controller
+export const getRecentChats = async (req, res) => {
+  try {
+    const userId = req.userId;  // protect middleware sets req.user
+
+    const messages = await Message.aggregate([
+      {
+        $match: {
+          $or: [
+            { from_user_id: userId },
+            { to_user_id: userId }
+          ]
+        }
+      },
+
+      { $sort: { createdAt: -1 } },
+
+      {
+        $group: {
+          _id: {
+            $cond: [
+              { $eq: ["$from_user_id", userId] },
+              "$to_user_id",
+              "$from_user_id"
+            ]
+          },
+          lastMessage: { $first: "$$ROOT" }
+        }
+      },
+
+      { $sort: { "lastMessage.createdAt": -1 } },
+      { $limit: 3 }
+    ]);
+
+    let final = [];
+
+    for (const chat of messages) {
+      const otherUserId =
+        chat.lastMessage.from_user_id === userId
+          ? chat.lastMessage.to_user_id
+          : chat.lastMessage.from_user_id;
+
+      const profile = await User.findById(otherUserId)
+        .select("full_name username profile_picture")
+        .lean();
+
+      final.push({
+        user: profile,
+        lastMessage: chat.lastMessage,
+        unseen:
+          !chat.lastMessage.seen &&
+          chat.lastMessage.to_user_id.toString() === userId.toString(),
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      chats: final
+    });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};

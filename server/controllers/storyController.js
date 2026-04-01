@@ -53,8 +53,12 @@ export const getStories = async (req, res) => {
         // user connections and followings
         const userIds = [userId, ...user.connections, ...user.following]
 
+        // Only return stories that haven't expired yet
+        const now = new Date()
+
         const stories = await Story.find({
-            user: {$in: userIds}
+            user: {$in: userIds},
+            expiresAt: { $gt: now }
         }).populate('user').sort({ createdAt: -1 });
 
         res.json({ success: true, stories });
